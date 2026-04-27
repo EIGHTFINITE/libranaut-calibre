@@ -16,6 +16,15 @@ jobs:
   calibre:
     runs-on: ubuntu-latest
     steps:
+    - name: Install
+      shell: bash
+      run: |
+        if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick poppler-utils
+        else
+          exit 0
+        fi
     - name: Download
       shell: bash
       run: |
@@ -24,12 +33,23 @@ jobs:
         libranaut_file_id=${libranaut_full_id: -3}
         libranaut_in_file=orig.${{ inputs.filetype }}
         curl -sSo $libranaut_in_file "${{ secrets.WORKFLOW_DOWNLOAD }}$libranaut_dir_id/$libranaut_file_id/$libranaut_in_file"
-        echo "libranaut_in_file=$libranaut_in_file" >> $GITHUB_ENV
+        if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
+          pdftoppm orig.pdf orig
+          for i in *.ppm; do
+            convert $i -quiet -quality 90 ${i/.ppm/.webp}
+          done
+          zip -q orig.cbz *.webp
+          echo "libranaut_in_file=orig.cbz" >> $GITHUB_ENV
+          echo "libranaut_args=--no-process" >> $GITHUB_ENV
+        else
+          echo "libranaut_in_file=$libranaut_in_file" >> $GITHUB_ENV
+          echo "libranaut_args=" >> $GITHUB_ENV
+        fi
     - uses: EIGHTFINITE/ebook-convert-action@main
       with:
         in: ${{ env.libranaut_in_file }}
         out: orig.zip
-        args:
+        args: ${{ env.libranaut_args }}
     - name: Upload
       shell: bash
       run: |
