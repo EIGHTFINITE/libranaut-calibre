@@ -17,16 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install
+      if: ${{ inputs.filetype == 'pdf' || inputs.filetype == 'xps' }}
       shell: bash
       run: |
+        sudo apt-get update
         if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends imagemagick poppler-utils
+          sudo apt-get install -y imagemagick poppler-utils
         elif [[ "${{ inputs.filetype }}" == "xps" ]]; then
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends imagemagick libgxps-utils
-        else
-          exit 0
+          sudo apt-get install -y imagemagick libgxps-utils
         fi
     - name: Download
       shell: bash
@@ -45,29 +43,55 @@ jobs:
         out: orig.zip
         args: ${{ env.libranaut_args }}
     - name: Process
+      if: ${{ inputs.filetype == 'pdf' || inputs.filetype == 'xps' }}
       shell: bash
       run: |
         if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
+          unzip -q orig.zip orig.html
+          rm orig.zip
           pdftoppm orig.pdf orig
           for i in *.ppm; do
             convert $i -quiet -quality 90 ${i/.ppm/.webp}
+            rm $i
           done
         elif [[ "${{ inputs.filetype }}" == "xps" ]]; then
           xpstopng orig.xps orig
           for i in *.png; do
             convert $i -quiet -quality 90 ${i/.png/.webp}
+            rm $i
           done
         fi
-        if [[ "${{ inputs.filetype }}" == "pdf" || "${{ inputs.filetype }}" == "xps" ]]; then
-          zip -q orig.cbz *.webp
-          echo "libranaut_in_file=orig.cbz" >> $GITHUB_ENV
-          echo "libranaut_args=--no-process" >> $GITHUB_ENV
-        fi
+        zip -q0 orig.cbz *.webp
+        rm *.webp
+        echo "libranaut_in_file=orig.cbz" >> $GITHUB_ENV
+        echo "libranaut_args=--no-process" >> $GITHUB_ENV
     - uses: EIGHTFINITE/ebook-convert-action@main
       with:
         in: ${{ env.libranaut_in_file }}
         out: orig.zip
         args: ${{ env.libranaut_args }}
+    - name: Extract
+      shell: bash
+      run: |
+        unzip -q orig.zip -d orig
+        rm orig.zip
+    - name: Process
+      shell: bash
+      run: |
+        if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
+          rm orig/orig.html
+          mv orig.html orig/orig.html
+          perl -pi -e 's/(<a .*?href=")orig_files\/index\.html(".*?>)/\1orig_files\/page_1.xhtml\2/' orig/orig.html
+          perl -pi -e 's/(<a .*?href=")orig_files\/index\.html#page_(.*?)(".*?>)/\1orig_files\/page_\2.xhtml\3/g' orig/orig.html
+        fi
+        perl -0777pi -e 's/\n<div class="calibreMeta">.*?\n<\/div>/\n/s' orig/orig.html
+        find orig/orig_files/ -type f -name '*.xhtml' \
+          -exec perl -0777pi -e 's/\n<div class="calibreMeta">.*?\n<\/div>/\n/s' {} \; \
+          -exec perl -0777pi -e 's/\n  <div class="calibreToc">.*?\n  <\/div>/\n/s' {} \;
+    - name: Archive
+      shell: bash
+      run: |
+        (cd orig && zip -rq0 ../orig.zip .)
     - name: Upload
       shell: bash
       run: |
