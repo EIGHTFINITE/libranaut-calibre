@@ -22,6 +22,9 @@ jobs:
         if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends imagemagick poppler-utils
+        elif [[ "${{ inputs.filetype }}" == "xps" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick libgxps-utils
         else
           exit 0
         fi
@@ -33,17 +36,32 @@ jobs:
         libranaut_file_id=${libranaut_full_id: -3}
         libranaut_in_file=orig.${{ inputs.filetype }}
         curl -sSo $libranaut_in_file "${{ secrets.WORKFLOW_DOWNLOAD }}$libranaut_dir_id/$libranaut_file_id/$libranaut_in_file"
+        echo "libranaut_in_file=$libranaut_in_file" >> $GITHUB_ENV
+        echo "libranaut_args=" >> $GITHUB_ENV
+    - uses: EIGHTFINITE/ebook-convert-action@main
+      if: ${{ inputs.filetype == 'pdf' }}
+      with:
+        in: ${{ env.libranaut_in_file }}
+        out: orig.zip
+        args: ${{ env.libranaut_args }}
+    - name: Process
+      shell: bash
+      run: |
         if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
           pdftoppm orig.pdf orig
           for i in *.ppm; do
             convert $i -quiet -quality 90 ${i/.ppm/.webp}
           done
+        elif [[ "${{ inputs.filetype }}" == "xps" ]]; then
+          xpstopng orig.xps orig
+          for i in *.png; do
+            convert $i -quiet -quality 90 ${i/.png/.webp}
+          done
+        fi
+        if [[ "${{ inputs.filetype }}" == "pdf" || "${{ inputs.filetype }}" == "xps" ]]; then
           zip -q orig.cbz *.webp
           echo "libranaut_in_file=orig.cbz" >> $GITHUB_ENV
           echo "libranaut_args=--no-process" >> $GITHUB_ENV
-        else
-          echo "libranaut_in_file=$libranaut_in_file" >> $GITHUB_ENV
-          echo "libranaut_args=" >> $GITHUB_ENV
         fi
     - uses: EIGHTFINITE/ebook-convert-action@main
       with:
