@@ -70,14 +70,11 @@ jobs:
         in: ${{ env.libranaut_in_file }}
         out: orig.zip
         args: ${{ env.libranaut_args }}
-    - name: Extract
+    - name: Process
       shell: bash
       run: |
         unzip -q orig.zip -d orig
         rm orig.zip
-    - name: Process
-      shell: bash
-      run: |
         if [[ "${{ inputs.filetype }}" == "pdf" ]]; then
           rm orig/orig.html
           mv orig.html orig/orig.html
@@ -85,12 +82,66 @@ jobs:
           perl -pi -e 's/(<a .*?href=")orig_files\/index\.html#page_(.*?)(".*?>)/\1orig_files\/page_\2.xhtml\3/g' orig/orig.html
         fi
         perl -0777pi -e 's/\n<div class="calibreMeta">.*?\n<\/div>/\n/s' orig/orig.html
-        find orig/orig_files/ -type f -name '*.xhtml' \
+        find orig/orig_files/ -type f \( -name '*.xhtml' -o -name '*.html' \) \
           -exec perl -0777pi -e 's/\n<div class="calibreMeta">.*?\n<\/div>/\n/s' {} \; \
           -exec perl -0777pi -e 's/\n  <div class="calibreToc">.*?\n  <\/div>/\n/s' {} \;
-    - name: Archive
-      shell: bash
-      run: |
+        rm orig/orig_files/calibreHtmlOutBasicCss.css
+        cat << 'EOF' > orig/orig_files/calibreHtmlOutBasicCss.css
+        body {
+          margin: 0px;
+          padding: 0.5em;
+          background-color: #fff;
+          font-size: 12px;
+          font-family: Arial, Helvetica, sans-serif;
+        }
+        
+        .calibreEbNav, .calibreEbNavTop {
+          text-align: center;
+        }
+        
+        .calibreEbNav a, .calibreEbNavTop a {
+          display: inline-block;
+          padding: 6px 12px;
+          font-family: 'Inter', sans-serif;
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 24px;
+          color: #fff;
+          text-align: center;
+          text-decoration: none;
+          vertical-align: middle;
+          cursor: pointer;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          user-select: none;
+          border: 1px solid #5200ff;
+          border-radius: 8px;
+          background-color: #5200ff;
+          font-optical-sizing: auto;
+          text-transform: capitalize;
+        }
+        
+        .calibreEbNav a:focus, .calibreEbNavTop a:focus {
+          box-shadow: 0 0 0 4px rgba(82, 0, 255, 0.2);
+        }
+        
+        .calibreTocIndex {
+          line-height: 18px;
+        }
+        
+        .calibreEbNav {
+          max-width: min(100%, 600px, calc(100vw - 1em));
+        }
+        
+        .calibreEbookContent {
+          max-width: min(100%, 600px, calc(100vw - 1em));
+        }
+        
+        img {
+          max-width: min(100%, 600px, calc(100vw - 1em));
+          object-fit: scale-down;
+        }
+        EOF
         (cd orig && zip -rq0 ../orig.zip .)
     - name: Upload
       shell: bash
