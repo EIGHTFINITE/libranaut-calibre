@@ -87,12 +87,14 @@ jobs:
           -exec perl -0777pi -e 's/\n  <div class="calibreToc">.*?\n  <\/div>/\n/s' {} \;
         rm orig/orig_files/calibreHtmlOutBasicCss.css
         cat << 'EOF' > orig/orig_files/calibreHtmlOutBasicCss.css
-        body {
+        html, body {
           margin: 0px;
-          padding: 0.5em;
+          padding: 0.25em;
           background-color: #fff;
           font-size: 12px;
           font-family: Arial, Helvetica, sans-serif;
+          overflow-x: hidden;
+          overflow-y: overlay;
         }
         
         .calibreEbNav, .calibreEbNavTop {
@@ -106,7 +108,7 @@ jobs:
           font-size: 16px;
           font-weight: 700;
           line-height: 24px;
-          color: #fff;
+          color: #5200ff;
           text-align: center;
           text-decoration: none;
           vertical-align: middle;
@@ -116,9 +118,15 @@ jobs:
           user-select: none;
           border: 1px solid #5200ff;
           border-radius: 8px;
-          background-color: #5200ff;
+          background-color: #fff;
           font-optical-sizing: auto;
           text-transform: capitalize;
+        }
+        
+        .calibreEbNav a:hover, .calibreEbNavTop a:hover,
+        .calibreEbNav a:active, .calibreEbNavTop a:active {
+          color: #fff;
+          background-color: #5200ff;
         }
         
         .calibreEbNav a:focus, .calibreEbNavTop a:focus {
@@ -129,21 +137,92 @@ jobs:
           line-height: 18px;
         }
         
-        .calibreEbNav {
+        .calibreEbookContent, .calibreEbNav {
           max-width: min(100%, 600px, calc(100vw - 1em));
+          margin-inline: auto;
         }
         
-        .calibreEbookContent {
-          max-width: min(100%, 600px, calc(100vw - 1em));
+        .calibreEbookContent:after {
+          display: block;
+          clear: both;
+          content: "";
         }
         
-        img {
-          max-width: min(100%, 600px, calc(100vw - 1em));
+        .calibreEbookContent > :not(:first-child), .calibreEbookContent > :not(:first-child) * {
+          width: auto !important;
+          height: auto !important;
+          max-width: min(100%, 600px, calc(100vw - 1em)) !important;
+          max-height: none !important;
+          position: static !important;
           object-fit: scale-down;
         }
         EOF
         (cd orig && zip -rq0 ../orig.zip .)
+        cat << 'EOF' > read.php
+        <?php
+        $chapters = [];
+        $currentFile = file_get_contents('orig/orig.html');
+        if($currentFile !== false) {
+          $currentMatches = [];
+          $currentMatchesCount = preg_match_all('/<a .*href="(.*)".*>(.*)<\/a>/U', $currentFile, $currentMatches);
+          if($currentMatchesCount === false) {
+            $currentMatchesCount = 0;
+          }
+          for($i = 0; ($i+1) < $currentMatchesCount; $i++) {
+            if(!isset($currentMatches[2][$i]) || !is_string($currentMatches[2][$i])) {
+              $currentMatchTitle = '';
+            }
+            else {
+              $currentMatchTitle = $currentMatches[2][$i];
+            }
+            if(!isset($currentMatches[1][$i]) || !is_string($currentMatches[1][$i])) {
+              $currentMatchPage = '';
+            }
+            else {
+              $currentMatchPage = explode('#', $currentMatches[1][$i], 2)[0];
+            }
+            $chapters[] = [$currentMatchTitle, $currentMatchPage];
+          }
+        }
+        file_put_contents('chapters.json', json_encode($chapters));
+        $pages = [];
+        $currentPage = 'orig.html';
+        $currentPath = '';
+        while(true) {
+          if($currentPath !== '') {
+            $currentPage = $currentPath.'/'.$currentPage;
+            $parts = array_filter(explode('/', $currentPage), 'strlen');
+            $pathArray = [];
+            foreach ($parts as $part) {
+              if('.' === $part) continue;
+              if('..' === $part) {
+                array_pop($pathArray);
+              } else {
+                $pathArray[] = $part;
+              }
+            }
+            $currentPage = implode('/', $pathArray);
+          }
+          $currentFile = file_get_contents('orig/'.$currentPage);
+          if($currentFile === false) {
+            break;
+          }
+          $pages[] = $currentPage;
+          $currentMatches = [];
+          preg_match('/<a .*href="(.*)".*>next page<\/a>/U', $currentFile, $currentMatches);
+          if(!isset($currentMatches[1]) || $currentMatches[1] === '') {
+            break;
+          }
+          $currentPath = substr($currentPage, 0, strrpos($currentPage, '/'));
+          $currentPage = $currentMatches[1];
+        }
+        file_put_contents('pages.json', json_encode($pages));
+        exit;
+        EOF
+        php read.php
+        rm read.php
+        rm -r orig
     - name: Upload
       shell: bash
       run: |
-        curl -sS -X POST -H "Content-Type: multipart/form-data" -F "data=@orig.zip" "${{ secrets.WORKFLOW_UPLOAD }}${{ inputs.fileid }}"
+        curl -sS -X POST -H "Content-Type: multipart/form-data" -F "data=@orig.zip" -F "chapters=@chapters.json" -F "pages=@pages.json" "${{ secrets.WORKFLOW_UPLOAD }}${{ inputs.fileid }}"
