@@ -99,38 +99,33 @@ jobs:
         
         .calibreEbNav, .calibreEbNavTop {
           text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
         }
         
         .calibreEbNav a, .calibreEbNavTop a {
           display: inline-block;
-          padding: 6px 12px;
           font-family: 'Inter', sans-serif;
           font-size: 16px;
           font-weight: 700;
           line-height: 24px;
           color: #5200ff;
-          text-align: center;
           text-decoration: none;
           vertical-align: middle;
           cursor: pointer;
-          -webkit-user-select: none;
-          -moz-user-select: none;
-          user-select: none;
-          border: 1px solid #5200ff;
-          border-radius: 8px;
-          background-color: #fff;
           font-optical-sizing: auto;
           text-transform: capitalize;
         }
         
-        .calibreEbNav a:hover, .calibreEbNavTop a:hover,
-        .calibreEbNav a:active, .calibreEbNavTop a:active {
-          color: #fff;
-          background-color: #5200ff;
+        .calibreEbNav a:only-child, .calibreEbNavTop a:only-child {
+          margin-inline: auto;
         }
         
+        .calibreEbNav a:hover, .calibreEbNavTop a:hover,
+        .calibreEbNav a:active, .calibreEbNavTop a:active,
         .calibreEbNav a:focus, .calibreEbNavTop a:focus {
-          box-shadow: 0 0 0 4px rgba(82, 0, 255, 0.2);
+          text-decoration: underline;
         }
         
         .calibreTocIndex {
