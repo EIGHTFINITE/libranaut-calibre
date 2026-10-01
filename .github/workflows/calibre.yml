@@ -33,7 +33,7 @@ jobs:
         libranaut_dir_id=${libranaut_full_id::-3}
         libranaut_file_id=${libranaut_full_id: -3}
         libranaut_in_file=orig.${{ inputs.filetype }}
-        curl -sSo $libranaut_in_file "${{ secrets.WORKFLOW_DOWNLOAD }}$libranaut_dir_id/$libranaut_file_id/$libranaut_in_file"
+        curl --retry 12 --retry-all-errors -fsSo $libranaut_in_file "${{ secrets.WORKFLOW_DOWNLOAD }}$libranaut_dir_id/$libranaut_file_id/$libranaut_in_file"
         echo "libranaut_in_file=$libranaut_in_file" >> $GITHUB_ENV
         echo "libranaut_args=" >> $GITHUB_ENV
     - uses: EIGHTFINITE/ebook-convert-action@main
@@ -220,4 +220,4 @@ jobs:
     - name: Upload
       shell: bash
       run: |
-        curl -sS -X POST -H "Content-Type: multipart/form-data" -F "data=@orig.zip" -F "chapters=@chapters.json" -F "pages=@pages.json" "${{ secrets.WORKFLOW_UPLOAD }}${{ inputs.fileid }}"
+        curl --retry 12 --retry-all-errors -fsS -X POST -H "Content-Type: multipart/form-data" -F "data=@orig.zip" -F "chapters=@chapters.json" -F "pages=@pages.json" "${{ secrets.WORKFLOW_UPLOAD }}${{ inputs.fileid }}"
