@@ -152,7 +152,6 @@ jobs:
           object-fit: scale-down;
         }
         EOF
-        (cd orig && zip -rq0 ../orig.zip .)
         cat << 'EOF' > read.php
         <?php
         $chapters = [];
@@ -183,6 +182,7 @@ jobs:
         $pages = [];
         $currentPage = 'orig.html';
         $currentPath = '';
+        file_put_contents('orig/continuous.html', '<div class="calibreEbookContent">');
         while(true) {
           if($currentPath !== '') {
             $currentPage = $currentPath.'/'.$currentPage;
@@ -202,6 +202,17 @@ jobs:
           if($currentFile === false) {
             break;
           }
+          if($currentPage !== 'orig.html') {
+            $outputHtml = $currentFile;
+            $outputHtml = preg_replace('/^.*<div class="calibreMain">/Us', '', $outputHtml, 1);
+            $outputHtml = preg_replace('/<div class="calibreEbNavTop">.*<\/div>/Us', '', $outputHtml, 1);
+            $outputHtml = preg_replace('/<div class="calibreEbNav">.*$/Us', '', $outputHtml, 1);
+            $outputHtml = trim($outputHtml);
+            $outputHtml = preg_replace('/^<div class="calibreEbookContent">[\s]*</Us', '<div class="calibreEbookContent"><', $outputHtml, 1);
+            $outputHtml = preg_replace('/>[\s]*<\/div>$/Us', '></div>', $outputHtml, 1);
+            $outputHtml = substr($outputHtml, 33, -6);
+            file_put_contents('orig/continuous.html', $outputHtml.'<div class="calibrePageMarker"></div>', FILE_APPEND);
+          }
           $pages[] = $currentPage;
           $currentMatches = [];
           preg_match('/<a .*href="(.*)".*>next page<\/a>/U', $currentFile, $currentMatches);
@@ -211,11 +222,13 @@ jobs:
           $currentPath = substr($currentPage, 0, strrpos($currentPage, '/'));
           $currentPage = $currentMatches[1];
         }
+        file_put_contents('orig/continuous.html', '</div>', FILE_APPEND);
         file_put_contents('pages.json', json_encode($pages));
         exit;
         EOF
         php read.php
         rm read.php
+        (cd orig && zip -rq0 ../orig.zip .)
         rm -r orig
     - name: Upload
       shell: bash
